@@ -1,0 +1,1348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MasterPiets 2.0</title>
+<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/foundation-icons/3.0/foundation-icons.min.css" rel="stylesheet">
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; padding: 10px; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 14px; }
+
+#app {
+    width: 100%;
+    margin-bottom: 1vh;
+    display: grid;
+    grid-column-gap: 1vw;
+    grid-row-gap: 1vh;
+    align-items: center;
+}
+
+.app-no-debug {
+    grid-template-columns: 375px 300px auto 25px;
+    grid-template-rows: 35px 35px 35px auto;
+    grid-template-areas:
+        'controls1 cpicker . dtab'
+        'controls2 cpicker . dtab'
+        'controls3 cpicker . dtab'
+        'grid grid grid grid';
+}
+
+.app-with-debug {
+    grid-template-columns: 375px 300px auto 225px;
+    grid-template-rows: 35px 35px 35px auto;
+    grid-template-areas:
+        'controls1 cpicker . debug'
+        'controls2 cpicker . debug'
+        'controls3 cpicker . debug'
+        'grid grid grid debug';
+}
+
+#controls-row-1 { grid-area: controls1; }
+#controls-row-2 { grid-area: controls2; display: flex; justify-content: space-between; align-items: center; }
+#controls-row-3 { grid-area: controls3; }
+#colour-picker { grid-area: cpicker; grid-row: 1 / 4; }
+#grid-container { grid-area: grid; align-self: start; justify-self: start; }
+#debug-tab { grid-area: dtab; }
+#debugger-panel {
+    grid-area: debug;
+    grid-row: 1 / 5;
+    align-self: start;
+    margin-top: 0;
+    width: 225px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background: white;
+    pointer-events: auto;
+}
+
+#grid-table {
+    margin: 1vh 0 0 0;
+    table-layout: fixed;
+    border-collapse: collapse;
+}
+
+#grid-table td {
+    border: 1px solid black;
+    max-height: 30px;
+    max-width: 30px;
+    text-align: center;
+    color: white;
+    font-size: 11px;
+    text-shadow: 1px 1px 1px black;
+    padding: 0;
+    overflow: hidden;
+}
+
+/* Colour picker table */
+#colour-picker td {
+    width: 32px;
+    height: 32px;
+    padding: 5px;
+    border: 1px solid black;
+    color: white;
+    text-shadow: 1px 1px 1px black;
+    text-align: center;
+    cursor: pointer;
+    font-size: 11px;
+}
+
+#colour-picker td.selected {
+    border: 4px double black;
+}
+
+/* Debugger */
+.debugger-drag-handle {
+    height: 25px;
+    padding: 0 5px 5px;
+    border-bottom: 1px solid #ddd;
+    border-radius: 5px 5px 0 0;
+    background-color: #eee;
+    cursor: ns-resize;
+}
+
+#command-list {
+    margin: 5px auto 10px;
+    padding: 5px;
+    width: 100%;
+    height: 40vh;
+    resize: vertical;
+    overflow: auto;
+    font-family: monospace;
+    font-size: 11pt;
+    background-color: #f5f5f5;
+    border: 1px solid #ccc;
+}
+
+#command-list .command-entry { text-transform: uppercase; cursor: pointer; }
+
+.stack-table { margin: auto auto 1vh; width: 100%; }
+.stack-table td {
+    border: 1px solid black;
+    width: 100%;
+    height: 2ex;
+    text-align: center;
+    vertical-align: middle;
+    font-family: monospace;
+    font-size: 12pt;
+    word-break: break-all;
+}
+
+textarea.io-field {
+    width: 100%;
+    max-width: 100%;
+    font-family: monospace;
+    font-size: 12pt;
+}
+
+/* Paint mode button active style */
+.paint-mode-btn.active-mode {
+    background-color: #d4d4d4;
+    box-shadow: inset 0 3px 5px rgba(0,0,0,.125);
+}
+
+/* Breakpoint stripe pattern - applied via JS */
+</style>
+</head>
+<body>
+
+<main class="container-fluid">
+<div class="page-header" style="margin-top:0; padding-bottom:5px;">
+    <h2 style="margin-top:10px;">MasterPiets 2.0</h2>
+    <p>An IDE for the programming language <a href="http://www.dangermouse.net/esoteric/piet.html">Piet</a>. A fork of <a href="https://gabriellesc.github.io/piet/">MasterPiets</a> by Gabrielle Singh Cadieux. I just fixed the import/export bugs.</p>
+</div>
+
+<div id="app" class="app-no-debug">
+
+    <!-- Controls Row 1: Import/Export + Paint Mode -->
+    <div id="controls-row-1" class="btn-toolbar" role="toolbar">
+        <input type="button" class="btn btn-primary" value="Import" id="import-btn">
+        <input id="fileChooser" type="file" accept="image/png, image/bmp, image/jpeg, image/gif" style="display:none">
+
+        <div class="btn-group">
+            <button type="button" class="btn btn-info" id="export-btn">Export to PNG</button>
+            <button type="button" class="btn btn-info dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <span class="caret"></span>
+                <span class="sr-only">Toggle Dropdown</span>
+            </button>
+            <ul class="dropdown-menu">
+                <li>
+                    <div class="form-group" style="margin-left:1vw; margin-bottom:0;">
+                        <label class="control-label" for="scale">Scale</label>
+                        <input id="scale" type="number" name="scale" class="form-control" style="width:5em; margin-left:4px; display:inline-block;" value="1" required>
+                    </div>
+                </li>
+            </ul>
+        </div>
+
+        <div class="btn-group" role="group" style="float:right;">
+            <button type="button" title="Brush mode (fill single pixel)" class="btn btn-default paint-mode-btn active-mode" id="brush-btn" style="padding:2px 12px;">
+                <i class="fi-pencil" style="font-size:14pt;"></i>
+            </button>
+            <button type="button" title="Bucket mode (fill block of pixels)" class="btn btn-default paint-mode-btn" id="bucket-btn" style="padding:2px 12px;">
+                <i class="fi-paint-bucket" style="font-size:14pt;"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Controls Row 2: Resize -->
+    <div id="controls-row-2">
+        <label for="input-height" style="margin:auto 0;">Height</label>
+        <input type="number" id="input-height" class="form-control" style="width:5em; display:inline-block;" required value="10">
+        <label for="input-width" style="margin:auto 0 auto 5px;">Width</label>
+        <input type="number" id="input-width" class="form-control" style="width:5em; display:inline-block;" required value="10">
+        <input type="button" class="btn btn-warning" value="Resize / Clear" id="resize-btn">
+    </div>
+
+    <!-- Controls Row 3: Block size display -->
+    <div id="controls-row-3">
+        <i class="glyphicon glyphicon-eye-close" id="bs-toggle" title="Show block sizes" style="font-size:16px; cursor:pointer;"></i>
+        <span id="block-info" style="margin-left:1em;"></span>
+    </div>
+
+    <!-- Colour Picker -->
+    <table id="colour-picker"><tbody id="colour-picker-body"></tbody></table>
+
+    <!-- Grid -->
+    <div id="grid-container">
+        <table id="grid-table"><tbody id="grid-body"></tbody></table>
+    </div>
+
+    <!-- Debug Tab (shown when debugger hidden) -->
+    <div id="debug-tab" style="writing-mode:vertical-rl; cursor:pointer; font-size:14px; color:#888; padding:5px;">
+        &#9654; Debug
+    </div>
+
+    <!-- Debugger Panel (hidden by default) -->
+    <div id="debugger-panel" style="display:none;">
+        <div class="debugger-drag-handle" id="debugger-drag">
+            <button type="button" class="close" aria-label="Close" id="close-debugger">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+        <div style="padding:5px;">
+            <div id="command-list"></div>
+            <div id="current-command-display" style="margin:-5px 0 10px; width:100%; font-weight:bold; text-align:center; display:none;"></div>
+
+            <!-- Debug Controls -->
+            <div class="btn-toolbar" role="toolbar" style="margin:0 0 1vh;">
+                <div class="btn-group btn-group-sm" style="width:52px; margin:0;">
+                    <button type="button" class="btn btn-success" title="Run from the beginning" id="debug-run">
+                        <i class="glyphicon glyphicon-play"></i>
+                    </button>
+                    <button type="button" class="btn btn-success dropdown-toggle" title="Set run speed" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" style="width:18px; padding-left:4px; padding-right:4px;">
+                        <span class="caret"></span>
+                        <span class="sr-only">Toggle Dropdown</span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li style="padding:0 5px;">
+                            <small style="float:left;">Slower</small>
+                            <small style="float:right;">Faster</small>
+                            <input type="range" min="0" max="1000" step="100" id="speed-slider" value="500">
+                        </li>
+                    </ul>
+                </div>
+                <div class="btn-group btn-group-sm" role="group" style="width:136px; margin:0 0 0 4px;">
+                    <button type="button" class="btn btn-warning" title="Pause" id="debug-pause">
+                        <i class="glyphicon glyphicon-pause"></i>
+                    </button>
+                    <button type="button" class="btn btn-info" title="Step" id="debug-step">
+                        <i class="glyphicon glyphicon-step-forward"></i>
+                    </button>
+                    <button type="button" class="btn btn-primary" title="Continue running from this point" id="debug-cont">
+                        <i class="glyphicon glyphicon-fast-forward"></i>
+                    </button>
+                    <button type="button" class="btn btn-danger" title="Stop" id="debug-stop">
+                        <i class="glyphicon glyphicon-stop"></i>
+                    </button>
+                </div>
+                <i class="glyphicon glyphicon-map-marker" title="Set breakpoints" id="bp-toggle" style="font-size:18px; margin:0 0 0 3px; padding:5px 0; cursor:pointer;"></i>
+            </div>
+
+            <!-- Pointers -->
+            <div id="pointers" style="width:100%; text-align:center; font-weight:bold; margin-bottom:1vh;"></div>
+
+            <!-- Stack -->
+            <table class="stack-table"><thead><tr><td><b>Stack</b></td></tr></thead><tbody id="stack-body"></tbody></table>
+
+            <!-- IO -->
+            <b>Input</b><br>
+            <textarea id="in" class="io-field" placeholder="Enter input before running program" title="Tip: Whitespace before a numerical value is ignored"></textarea><br>
+            <b>Output</b><br>
+            <textarea id="out" class="io-field" readonly></textarea>
+        </div>
+    </div>
+</div>
+</main>
+
+<script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+
+<script>
+(function() {
+'use strict';
+
+// ============================================================
+// COLOURS
+// ============================================================
+const colours = [
+    '#FFC0C0', '#FFFFC0', '#C0FFC0', '#C0FFFF', '#C0C0FF', '#FFC0FF',
+    '#FF0000', '#FFFF00', '#00FF00', '#00FFFF', '#0000FF', '#FF00FF',
+    '#C00000', '#C0C000', '#00C000', '#00C0C0', '#0000C0', '#C000C0',
+    '#FFFFFF', '#000000',
+];
+const WHITE = 18, BLACK = 19;
+
+// Parse colour hex to RGB for import matching
+function hexToRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+const colourRgbs = colours.map(hexToRgb);
+
+// ============================================================
+// ORDERED COMMANDS (18x18 table)
+// ============================================================
+const commands = [
+    ['','+','/','>', 'dup','in(char)','push','-','mod','pointer','roll','out(num)','pop','*','not','switch','in(num)','out(char)'],
+    ['in(char)','','+','/','>', 'dup','out(num)','push','-','mod','pointer','roll','out(char)','pop','*','not','switch','in(num)'],
+    ['dup','in(char)','','+','/','>', 'roll','out(num)','push','-','mod','pointer','in(num)','out(char)','pop','*','not','switch'],
+    ['>','dup','in(char)','','+','/', 'pointer','roll','out(num)','push','-','mod','switch','in(num)','out(char)','pop','*','not'],
+    ['/','>', 'dup','in(char)','','+', 'mod','pointer','roll','out(num)','push','-','not','switch','in(num)','out(char)','pop','*'],
+    ['+','/','>', 'dup','in(char)','', '-','mod','pointer','roll','out(num)','push','*','not','switch','in(num)','out(char)','pop'],
+    ['pop','*','not','switch','in(num)','out(char)', '','+'  ,'/','>', 'dup','in(char)','push','-','mod','pointer','roll','out(num)'],
+    ['out(char)','pop','*','not','switch','in(num)', 'in(char)','','+','/','>', 'dup','out(num)','push','-','mod','pointer','roll'],
+    ['in(num)','out(char)','pop','*','not','switch', 'dup','in(char)','','+','/','>', 'roll','out(num)','push','-','mod','pointer'],
+    ['switch','in(num)','out(char)','pop','*','not', '>','dup','in(char)','','+','/', 'pointer','roll','out(num)','push','-','mod'],
+    ['not','switch','in(num)','out(char)','pop','*', '/','>', 'dup','in(char)','','+', 'mod','pointer','roll','out(num)','push','-'],
+    ['*','not','switch','in(num)','out(char)','pop', '+','/','>', 'dup','in(char)','', '-','mod','pointer','roll','out(num)','push'],
+    ['push','-','mod','pointer','roll','out(num)', 'pop','*','not','switch','in(num)','out(char)', '','+'  ,'/','>', 'dup','in(char)'],
+    ['out(num)','push','-','mod','pointer','roll', 'out(char)','pop','*','not','switch','in(num)', 'in(char)','','+','/','>', 'dup'],
+    ['roll','out(num)','push','-','mod','pointer', 'in(num)','out(char)','pop','*','not','switch', 'dup','in(char)','','+','/','>' ],
+    ['pointer','roll','out(num)','push','-','mod', 'switch','in(num)','out(char)','pop','*','not', '>','dup','in(char)','','+','/' ],
+    ['mod','pointer','roll','out(num)','push','-', 'not','switch','in(num)','out(char)','pop','*', '/','>', 'dup','in(char)','','+'],
+    ['-','mod','pointer','roll','out(num)','push', '*','not','switch','in(num)','out(char)','pop', '+','/','>', 'dup','in(char)',''],
+];
+
+// ============================================================
+// INTERPRETER (generator-based, ported directly from original)
+// ============================================================
+function getNextColour(grid, height, width, row, col, DP, CC) {
+    let origColour = grid[row][col];
+    let visited = Array(height).fill(0).map(() => Array(width).fill(false));
+    let farEdge = undefined;
+    let stack = [[row, col]];
+
+    while (stack.length > 0) {
+        const [r, c] = stack.pop();
+        if (r < 0 || c < 0 || r >= height || c >= width || visited[r][c] || grid[r][c] !== origColour) continue;
+        visited[r][c] = true;
+
+        switch (DP) {
+            case 0: // right
+                if (c + 1 === width || grid[r][c + 1] !== origColour) {
+                    if (!farEdge || c + 1 > farEdge[1] ||
+                        (c + 1 === farEdge[1] && ((CC && r > farEdge[0]) || (!CC && r < farEdge[0])))) {
+                        farEdge = [r, c + 1];
+                    }
+                }
+                break;
+            case 1: // down
+                if (r + 1 === height || grid[r + 1][c] !== origColour) {
+                    if (!farEdge || r + 1 > farEdge[0] ||
+                        (r + 1 === farEdge[0] && ((CC && c < farEdge[1]) || (!CC && c > farEdge[1])))) {
+                        farEdge = [r + 1, c];
+                    }
+                }
+                break;
+            case 2: // left
+                if (c === 0 || grid[r][c - 1] !== origColour) {
+                    if (!farEdge || c - 1 < farEdge[1] ||
+                        (c - 1 === farEdge[1] && ((CC && r < farEdge[0]) || (!CC && r > farEdge[0])))) {
+                        farEdge = [r, c - 1];
+                    }
+                }
+                break;
+            case 3: // up
+                if (r === 0 || grid[r - 1][c] !== origColour) {
+                    if (!farEdge || r - 1 < farEdge[0] ||
+                        (r - 1 === farEdge[0] && ((CC && c > farEdge[1]) || (!CC && c < farEdge[1])))) {
+                        farEdge = [r - 1, c];
+                    }
+                }
+                break;
+        }
+
+        stack.push([r, c + 1], [r + 1, c], [r, c - 1], [r - 1, c]);
+    }
+
+    return farEdge;
+}
+
+function* interpret(grid, blocks, blockSizes, getInputNum, getInputChar) {
+    let height = grid.length, width = grid[0].length;
+    let row = 0, col = 0;
+    let DP = 0, CC = 0;
+    let stack = [], output = '', commandList = [];
+    let bounceCount = 0;
+    let inst, nextColour, block, currCommand;
+
+    function slide(r, c) {
+        let nr = r, nc = c;
+        switch (DP) {
+            case 0: for (; nc < width && grid[r][nc] === WHITE; nc++); break;
+            case 1: for (; nr < height && grid[nr][c] === WHITE; nr++); break;
+            case 2: for (; nc >= 0 && grid[r][nc] === WHITE; nc--); break;
+            case 3: for (; nr >= 0 && grid[nr][c] === WHITE; nr--); break;
+        }
+        return [nr, nc];
+    }
+
+    function slideOut(r, c) {
+        function routeIsDoubled(array) {
+            let len = array.length;
+            if (!len || len % 2 !== 0) return false;
+            let first = array.slice(0, len / 2), second = array.slice(len / 2);
+            return first.every((elem, i) => elem[0] === second[i][0] && elem[1] === second[i][1]);
+        }
+
+        let [nr, nc] = slide(r, c);
+        if (nr < 0 || nr >= height || nc < 0 || nc >= width || grid[nr][nc] === BLACK) {
+            [nr, nc] = [r, c];
+        } else {
+            return [nr, nc];
+        }
+
+        let whiteRoute = [];
+        while (!routeIsDoubled(whiteRoute)) {
+            bounce(); bounce();
+            [nr, nc] = slide(nr, nc);
+            if (nr < 0 || nr >= height || nc < 0 || nc >= width || grid[nr][nc] === BLACK) {
+                switch (DP) {
+                    case 0: nc--; break;
+                    case 1: nr--; break;
+                    case 2: nc++; break;
+                    case 3: nr++; break;
+                }
+                whiteRoute.push([nr, nc]);
+            } else {
+                return [nr, nc];
+            }
+        }
+        return null;
+    }
+
+    function bounce() {
+        bounceCount++;
+        if (bounceCount % 2 !== 0) {
+            CC = (CC + 1) % 2;
+            return { CC };
+        } else {
+            DP = (DP + 1) % 4;
+            return { DP };
+        }
+    }
+
+    while (bounceCount < 8) {
+        let colour = grid[row][col];
+        let pushVal = blockSizes[row][col];
+        let [nextRow, nextCol] = getNextColour(grid, height, width, row, col, DP, CC);
+
+        if (nextRow < 0 || nextRow >= height || nextCol < 0 || nextCol >= width || grid[nextRow][nextCol] === BLACK) {
+            yield bounce();
+        } else if (grid[nextRow][nextCol] === WHITE) {
+            let initDP = DP;
+            let out = slideOut(nextRow, nextCol);
+            if (DP !== initDP) yield { DP, CC };
+            if (out == null) return;
+            [row, col] = out;
+            bounceCount = 0;
+        } else {
+            [row, col] = [nextRow, nextCol];
+            bounceCount = 0;
+            nextColour = grid[row][col];
+            inst = commands[colour][nextColour];
+            block = blocks[row][col];
+            currCommand = { block, inst };
+
+            switch (inst) {
+                case 'push':
+                    stack.push(pushVal);
+                    currCommand.inst += ' ' + pushVal;
+                    yield { commandList, block, currCommand, stack };
+                    break;
+                case 'pop': {
+                    let op = stack.pop();
+                    if (op === undefined) currCommand.error = 'stack underflow';
+                    yield { commandList, block, currCommand, stack };
+                    break;
+                }
+                case '+': {
+                    let op1 = stack.pop(), op2 = stack.pop();
+                    if (op1 === undefined || op2 === undefined) {
+                        currCommand.error = 'stack underflow';
+                        if (op1 !== undefined) stack.push(op1);
+                    } else {
+                        let result = op1 + op2;
+                        if (!Number.isFinite(result)) {
+                            currCommand.error = 'integer overflow';
+                            yield { commandList, block, currCommand };
+                            commandList.push(currCommand); yield { commandList }; return;
+                        }
+                        stack.push(result);
+                    }
+                    yield { commandList, block, currCommand, stack };
+                    break;
+                }
+                case '-': {
+                    let op1 = stack.pop(), op2 = stack.pop();
+                    if (op1 === undefined || op2 === undefined) {
+                        currCommand.error = 'stack underflow';
+                        if (op1 !== undefined) stack.push(op1);
+                    } else {
+                        let result = op2 - op1;
+                        if (!Number.isFinite(result)) {
+                            currCommand.error = 'integer overflow';
+                            yield { commandList, block, currCommand };
+                            commandList.push(currCommand); yield { commandList }; return;
+                        }
+                        stack.push(result);
+                    }
+                    yield { commandList, block, currCommand, stack };
+                    break;
+                }
+                case '*': {
+                    let op1 = stack.pop(), op2 = stack.pop();
+                    if (op1 === undefined || op2 === undefined) {
+                        currCommand.error = 'stack underflow';
+                        if (op1 !== undefined) stack.push(op1);
+                    } else {
+                        let result = op1 * op2;
+                        if (!Number.isFinite(result)) {
+                            currCommand.error = 'integer overflow';
+                            yield { commandList, block, currCommand };
+                            commandList.push(currCommand); yield { commandList }; return;
+                        }
+                        stack.push(result);
+                    }
+                    yield { commandList, block, currCommand, stack };
+                    break;
+                }
+                case '/': {
+                    let op1 = stack.pop(), op2 = stack.pop();
+                    if (op1 === undefined || op2 === undefined) {
+                        currCommand.error = 'stack underflow';
+                        if (op1 !== undefined) stack.push(op1);
+                    } else if (op1 === 0) {
+                        currCommand.error = 'divide by zero';
+                        stack.push(op2); stack.push(op1);
+                    } else {
+                        stack.push(Math.floor(op2 / op1));
+                    }
+                    yield { commandList, block, currCommand, stack };
+                    break;
+                }
+                case 'mod': {
+                    let op1 = stack.pop(), op2 = stack.pop();
+                    if (op1 === undefined || op2 === undefined) {
+                        currCommand.error = 'stack underflow';
+                        if (op1 !== undefined) stack.push(op1);
+                    } else if (op1 === 0) {
+                        currCommand.error = 'divide by zero';
+                        stack.push(op2); stack.push(op1);
+                    } else {
+                        stack.push(op2 - op1 * Math.floor(op2 / op1));
+                    }
+                    yield { commandList, block, currCommand, stack };
+                    break;
+                }
+                case 'not': {
+                    let op = stack.pop();
+                    if (op === undefined) { currCommand.error = 'stack underflow'; }
+                    else { stack.push(op === 0 ? 1 : 0); }
+                    yield { commandList, block, currCommand, stack };
+                    break;
+                }
+                case '>': {
+                    let op1 = stack.pop(), op2 = stack.pop();
+                    if (op1 === undefined || op2 === undefined) {
+                        currCommand.error = 'stack underflow';
+                        if (op1 !== undefined) stack.push(op1);
+                    } else {
+                        stack.push(op2 > op1 ? 1 : 0);
+                    }
+                    yield { commandList, block, currCommand, stack };
+                    break;
+                }
+                case 'pointer': {
+                    let op = stack.pop();
+                    if (op === undefined) { currCommand.error = 'stack underflow'; }
+                    else if (op > 0) { DP = (DP + op) % 4; }
+                    else { DP = ((DP + (op % 4)) % 4 + 4) % 4; }
+                    yield { commandList, block, currCommand, stack, DP };
+                    break;
+                }
+                case 'switch': {
+                    let op = stack.pop();
+                    if (op === undefined) { currCommand.error = 'stack underflow'; }
+                    else { CC = ((CC + op) % 2 + 2) % 2; }
+                    yield { commandList, block, currCommand, stack, CC };
+                    break;
+                }
+                case 'dup': {
+                    let op = stack.pop();
+                    if (op === undefined) { currCommand.error = 'stack underflow'; }
+                    else { stack.push(op); stack.push(op); }
+                    yield { commandList, block, currCommand, stack };
+                    break;
+                }
+                case 'roll': {
+                    let op1 = stack.pop(), op2 = stack.pop();
+                    if (op1 === undefined || op2 === undefined) {
+                        currCommand.error = 'stack underflow';
+                        if (op1 !== undefined) stack.push(op1);
+                    } else if (op2 < 0) {
+                        currCommand.error = 'negative roll depth';
+                        stack.push(op2); stack.push(op1);
+                    } else {
+                        if (op2 > stack.length) op2 = stack.length;
+                        if (op1 > 0) {
+                            for (let roll = 0; roll < op1; roll++) {
+                                stack.splice(-op2, 0, stack[stack.length - 1]);
+                                stack.pop();
+                            }
+                        } else {
+                            for (let roll = 0; roll > op1; roll--) {
+                                stack.push(...stack.splice(-op2, 1));
+                            }
+                        }
+                    }
+                    yield { commandList, block, currCommand, stack };
+                    break;
+                }
+                case 'in(num)': {
+                    let newNum = getInputNum();
+                    if (newNum == null) { currCommand.error = 'invalid input'; }
+                    else { stack.push(newNum); }
+                    yield { commandList, block, currCommand, stack };
+                    break;
+                }
+                case 'in(char)': {
+                    let newChar = getInputChar();
+                    if (newChar == null) { currCommand.error = 'invalid input'; }
+                    else { stack.push(newChar.charCodeAt(0)); }
+                    yield { commandList, block, currCommand, stack };
+                    break;
+                }
+                case 'out(num)': {
+                    let op = stack.pop();
+                    if (op === undefined) { currCommand.error = 'stack underflow'; }
+                    else { output += op; }
+                    yield { commandList, block, currCommand, stack, output };
+                    break;
+                }
+                case 'out(char)': {
+                    let op = stack.pop();
+                    if (op === undefined) { currCommand.error = 'stack underflow'; }
+                    else { output += String.fromCharCode(op); }
+                    yield { commandList, block, currCommand, stack, output };
+                    break;
+                }
+            }
+            commandList.push(currCommand);
+        }
+    }
+}
+
+// ============================================================
+// APP STATE
+// ============================================================
+const HEIGHT = 10, WIDTH = 10;
+
+const appState = {
+    listeners: [],
+    height: HEIGHT,
+    width: WIDTH,
+    cellDim: Math.min(30, (window.innerWidth - 40) / WIDTH),
+
+    grid: Array(HEIGHT).fill(0).map(() => Array(WIDTH).fill(WHITE)),
+    blocks: Array(HEIGHT).fill(0).map(() => Array(WIDTH).fill(0)),
+    blockSizes: Array(HEIGHT).fill(0).map(() => Array(WIDTH).fill(HEIGHT * WIDTH)),
+
+    selectedColour: 0,
+    commands: commands[0],
+    paintMode: 'BRUSH',
+    cellInFocus: null,
+    displayBS: false,
+
+    subscribe(listener) { this.listeners.push(listener); },
+    notify() { this.listeners.forEach(fn => fn()); },
+
+    resize({ height, width }) {
+        if (!height || height < 1 || !width || width < 1) return;
+        this.height = height;
+        this.width = width;
+        this.cellDim = Math.min(30, (window.innerWidth - 280) / width);
+        this.grid = Array(height).fill(0).map(() => Array(width).fill(WHITE));
+        this.blockSizes = Array(height).fill(0).map(() => Array(width).fill(height * width));
+        this.blocks = Array(height).fill(0).map(() => Array(width).fill(0));
+        this.notify();
+    },
+
+    selectColour(colour) {
+        this.selectedColour = colour;
+        this.commands = (colour === WHITE || colour === BLACK) ? [] : commands[colour];
+        this.notify();
+    },
+
+    selectPaintMode(mode) {
+        this.paintMode = mode;
+        this.notify();
+    },
+
+    handleCellClick(row, col) {
+        switch (this.paintMode) {
+            case 'BRUSH': this.brushPaint(row, col); break;
+            case 'BUCKET': this.bucketPaint(row, col); break;
+            case 'BP': this.debug.toggleBP(row, col); break;
+        }
+    },
+
+    brushPaint(row, col) {
+        this.grid[row][col] = this.selectedColour;
+        let b = this.computeBlocks();
+        this.blocks = b.blockMap;
+        this.blockSizes = b.blockSizes;
+        this.notify();
+    },
+
+    bucketPaint(row, col) {
+        const self = this;
+        if (this.grid[row][col] !== this.selectedColour) {
+            const origColour = this.grid[row][col];
+            const selectedColour = this.selectedColour;
+            // Use iterative flood fill to avoid stack overflow on large grids
+            const stack = [[row, col]];
+            while (stack.length > 0) {
+                const [r, c] = stack.pop();
+                if (r < 0 || r >= self.height || c < 0 || c >= self.width) continue;
+                if (self.grid[r][c] !== origColour) continue;
+                self.grid[r][c] = selectedColour;
+                stack.push([r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]);
+            }
+        }
+        let b = this.computeBlocks();
+        this.blocks = b.blockMap;
+        this.blockSizes = b.blockSizes;
+        this.notify();
+    },
+
+    setCellInFocus(row, col) {
+        this.cellInFocus = (row == null) ? null : [row, col];
+        this.notify();
+    },
+
+    toggleDisplayBS() {
+        this.displayBS = !this.displayBS;
+        this.notify();
+    },
+
+    exportPng(scale) {
+        scale = scale || 1;
+        const canvas = document.createElement('canvas');
+        canvas.width = this.width * scale;
+        canvas.height = this.height * scale;
+        const ctx = canvas.getContext('2d');
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                ctx.fillStyle = colours[this.grid[y][x]];
+                ctx.fillRect(x * scale, y * scale, scale, scale);
+            }
+        }
+        const link = document.createElement('a');
+        link.download = 'piet_program.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    },
+
+    importImg(file) {
+        const self = this;
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                const imageData = ctx.getImageData(0, 0, img.width, img.height);
+                const data = imageData.data;
+
+                self.height = img.height;
+                self.width = img.width;
+                self.cellDim = Math.min(30, (window.innerWidth - 280) / img.width);
+                self.grid = Array(img.height).fill(0).map(() => Array(img.width).fill(WHITE));
+
+                for (let y = 0; y < img.height; y++) {
+                    for (let x = 0; x < img.width; x++) {
+                        const idx = (y * img.width + x) * 4;
+                        const r = data[idx], g = data[idx + 1], b = data[idx + 2];
+                        // Find exact match first, then nearest colour
+                        let bestIdx = WHITE;
+                        let bestDist = Infinity;
+                        for (let ci = 0; ci < colours.length; ci++) {
+                            const [cr, cg, cb] = colourRgbs[ci];
+                            const dist = (r - cr) ** 2 + (g - cg) ** 2 + (b - cb) ** 2;
+                            if (dist === 0) { bestIdx = ci; break; }
+                            if (dist < bestDist) { bestDist = dist; bestIdx = ci; }
+                        }
+                        self.grid[y][x] = bestIdx;
+                    }
+                }
+
+                let blocks = self.computeBlocks();
+                self.blocks = blocks.blockMap;
+                self.blockSizes = blocks.blockSizes;
+
+                // Update dimension inputs
+                document.getElementById('input-height').value = self.height;
+                document.getElementById('input-width').value = self.width;
+
+                self.notify();
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    },
+
+    computeBlocks() {
+        const self = this;
+        let blockMap = Array(self.height).fill(0).map(() => Array(self.width).fill(-1));
+        let blockSizes = Array(self.height).fill(0).map(() => Array(self.width).fill(0));
+
+        // Iterative flood fill to avoid stack overflow
+        function labelBlock(startRow, startCol, blockColour, label) {
+            const stack = [[startRow, startCol]];
+            let size = 0;
+            while (stack.length > 0) {
+                const [r, c] = stack.pop();
+                if (r < 0 || r >= self.height || c < 0 || c >= self.width) continue;
+                if (blockMap[r][c] !== -1 || self.grid[r][c] !== blockColour) continue;
+                blockMap[r][c] = label;
+                size++;
+                stack.push([r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]);
+            }
+            return size;
+        }
+
+        let labelMap = [];
+        for (let i = 0; i < self.height; i++) {
+            for (let j = 0; j < self.width; j++) {
+                if (blockMap[i][j] === -1) {
+                    labelMap.push(labelBlock(i, j, self.grid[i][j], labelMap.length));
+                }
+            }
+        }
+
+        for (let i = 0; i < self.height; i++) {
+            for (let j = 0; j < self.width; j++) {
+                blockSizes[i][j] = labelMap[blockMap[i][j]];
+            }
+        }
+
+        return { blockMap, blockSizes };
+    },
+
+    toggleDebugger() {
+        this.debug.debugIsVisible = !this.debug.debugIsVisible;
+        this.notify();
+    },
+
+    debug: {
+        debugIsVisible: false,
+        commandList: [],
+        interpreter: null,
+        runner: null,
+        runSpeed: 500,
+        breakpoints: [],
+        DP: 0, CC: 0,
+        stack: [],
+        output: '',
+        input: '',
+        inputPtr: 0,
+        block: null,
+        currCommand: null,
+
+        setRunSpeed(speed) {
+            this.runSpeed = speed;
+            appState.notify();
+        },
+
+        selectBlock(block) {
+            this.block = block;
+            appState.notify();
+        },
+
+        initDebugger() {
+            this.commandList = [];
+            this.DP = 0; this.CC = 0;
+            this.stack = []; this.output = '';
+            this.inputPtr = 0;
+            this.block = null; this.currCommand = null;
+            this.interpreter = null;
+            this.receiveInput();
+            appState.notify();
+
+            this.interpreter = interpret(
+                appState.grid, appState.blocks, appState.blockSizes,
+                this.getInputNum.bind(this), this.getInputChar.bind(this)
+            );
+        },
+
+        receiveInput() {
+            this.input = document.getElementById('in').value;
+        },
+
+        getInputNum() {
+            if (this.input.length < this.inputPtr) return null;
+            // skip whitespace
+            while (this.inputPtr < this.input.length && /\s/.test(this.input[this.inputPtr])) {
+                this.inputPtr++;
+            }
+            let num = '';
+            while (this.inputPtr < this.input.length && /[0-9]/.test(this.input[this.inputPtr])) {
+                num += this.input[this.inputPtr++];
+            }
+            if (num.length === 0) return null;
+            return parseInt(num);
+        },
+
+        getInputChar() {
+            if (this.input.length <= this.inputPtr) return null;
+            return this.input[this.inputPtr++];
+        },
+
+        toggleSetBP() {
+            appState.paintMode = (appState.paintMode === 'BP') ? 'BRUSH' : 'BP';
+            appState.notify();
+        },
+
+        toggleBP(row, col) {
+            let block = appState.blocks[row][col];
+            let i = this.breakpoints.indexOf(block);
+            if (i === -1) { this.breakpoints.push(block); }
+            else { this.breakpoints.splice(i, 1); }
+            appState.notify();
+        },
+
+        start() {
+            this.initDebugger();
+            this.cont();
+        },
+
+        step() {
+            if (!this.interpreter) this.initDebugger();
+            let s = this.interpreter.next();
+            if (!s.done) {
+                for (let prop in s.value) this[prop] = s.value[prop];
+                appState.notify();
+            } else {
+                this.interpreter = null;
+                appState.notify();
+            }
+        },
+
+        cont() {
+            const self = this;
+            function updateDebugger() {
+                if (!self.interpreter) {
+                    clearInterval(self.runner);
+                    return;
+                }
+                let s = self.interpreter.next();
+                if (s.done) {
+                    self.interpreter = null;
+                    appState.notify();
+                } else {
+                    for (let prop in s.value) self[prop] = s.value[prop];
+                    appState.notify();
+                    if (self.breakpoints.includes(s.value.block)) {
+                        clearInterval(self.runner);
+                    }
+                }
+            }
+            this.runner = window.setInterval(updateDebugger, this.runSpeed);
+        },
+
+        stop() {
+            this.interpreter = null;
+            this.block = null;
+            this.currCommand = null;
+            clearInterval(this.runner);
+            appState.notify();
+        },
+
+        pause() {
+            clearInterval(this.runner);
+        },
+    },
+};
+
+// ============================================================
+// RENDERING
+// ============================================================
+let gridCells = []; // 2D array of <td> references for efficient updates
+let lastGridHeight = 0, lastGridWidth = 0;
+
+function buildGrid() {
+    const tbody = document.getElementById('grid-body');
+    tbody.innerHTML = '';
+    gridCells = [];
+
+    for (let i = 0; i < appState.height; i++) {
+        const tr = document.createElement('tr');
+        const row = [];
+        for (let j = 0; j < appState.width; j++) {
+            const td = document.createElement('td');
+            td.title = '(' + j + ',' + i + ')';
+            td.style.height = appState.cellDim + 'px';
+            td.style.width = appState.cellDim + 'px';
+            td.dataset.row = i;
+            td.dataset.col = j;
+            row.push(td);
+            tr.appendChild(td);
+        }
+        gridCells.push(row);
+        tbody.appendChild(tr);
+    }
+
+    lastGridHeight = appState.height;
+    lastGridWidth = appState.width;
+}
+
+function updateGrid() {
+    if (appState.height !== lastGridHeight || appState.width !== lastGridWidth) {
+        buildGrid();
+    }
+
+    const cursor = {
+        'BRUSH': 'crosshair',
+        'BUCKET': 'cell',
+        'BP': 'pointer',
+    }[appState.paintMode];
+
+    // Update grid span
+    const gridContainer = document.getElementById('grid-container');
+    gridContainer.style.gridColumn = 'grid / span ' + (appState.debug.debugIsVisible ? '3' : '4');
+
+    for (let i = 0; i < appState.height; i++) {
+        for (let j = 0; j < appState.width; j++) {
+            const td = gridCells[i][j];
+            const colIdx = appState.grid[i][j];
+            const colour = colours[colIdx];
+            const isBreakpoint = appState.debug.breakpoints.includes(appState.blocks[i][j]);
+
+            td.style.height = appState.cellDim + 'px';
+            td.style.width = appState.cellDim + 'px';
+            td.style.cursor = cursor;
+
+            if (isBreakpoint) {
+                td.style.background = 'repeating-linear-gradient(45deg, ' + colour + ', ' + colour + ' 2px, black 2px, black 4px)';
+            } else {
+                td.style.background = colour;
+            }
+
+            // Cell content
+            if (appState.blocks[i][j] === appState.debug.block) {
+                td.textContent = '\u25C9'; // ◉
+            } else if (appState.displayBS && appState.blockSizes[i][j]) {
+                td.textContent = appState.blockSizes[i][j];
+            } else {
+                td.textContent = '';
+            }
+        }
+    }
+}
+
+function updateColourPicker() {
+    const tbody = document.getElementById('colour-picker-body');
+    tbody.innerHTML = '';
+
+    const colourRows = [
+        colours.slice(0, 6).map((_, j) => j),
+        colours.slice(6, 12).map((_, j) => 6 + j),
+        colours.slice(12, 18).map((_, j) => 12 + j),
+    ];
+
+    for (const row of colourRows) {
+        const tr = document.createElement('tr');
+        for (const ci of row) {
+            const td = document.createElement('td');
+            td.style.backgroundColor = colours[ci];
+            if (appState.selectedColour === ci) td.className = 'selected';
+            td.textContent = appState.commands[ci] || '';
+            td.onclick = () => appState.selectColour(ci);
+            tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+    }
+
+    // White and black row
+    const tr = document.createElement('tr');
+    const tdWhite = document.createElement('td');
+    tdWhite.colSpan = 3;
+    tdWhite.style.backgroundColor = colours[WHITE];
+    if (appState.selectedColour === WHITE) tdWhite.className = 'selected';
+    tdWhite.onclick = () => appState.selectColour(WHITE);
+    tr.appendChild(tdWhite);
+
+    const tdBlack = document.createElement('td');
+    tdBlack.colSpan = 3;
+    tdBlack.style.backgroundColor = colours[BLACK];
+    if (appState.selectedColour === BLACK) tdBlack.className = 'selected';
+    tdBlack.onclick = () => appState.selectColour(BLACK);
+    tr.appendChild(tdBlack);
+
+    tbody.appendChild(tr);
+}
+
+function updateControls() {
+    const isInterpreting = appState.debug.interpreter != null;
+
+    // Import/Resize disable state
+    document.getElementById('import-btn').disabled = isInterpreting;
+    document.getElementById('resize-btn').disabled = isInterpreting;
+
+    // Paint mode buttons
+    document.getElementById('brush-btn').className = 'btn btn-default paint-mode-btn' + (appState.paintMode === 'BRUSH' ? ' active-mode' : '');
+    document.getElementById('bucket-btn').className = 'btn btn-default paint-mode-btn' + (appState.paintMode === 'BUCKET' ? ' active-mode' : '');
+
+    // Block size toggle icon
+    const bsToggle = document.getElementById('bs-toggle');
+    bsToggle.className = appState.displayBS ? 'glyphicon glyphicon-eye-open' : 'glyphicon glyphicon-eye-close';
+
+    // Block info
+    const blockInfo = document.getElementById('block-info');
+    if (appState.cellInFocus) {
+        const [r, c] = appState.cellInFocus;
+        blockInfo.innerHTML = '<b>' + appState.blockSizes[r][c] + ' pixels in block</b>';
+    } else {
+        blockInfo.innerHTML = '';
+    }
+
+    // Input readonly when interpreting
+    document.getElementById('in').readOnly = isInterpreting;
+}
+
+function updateDebugger() {
+    const panel = document.getElementById('debugger-panel');
+    const tab = document.getElementById('debug-tab');
+    const app = document.getElementById('app');
+
+    if (appState.debug.debugIsVisible) {
+        panel.style.display = 'block';
+        tab.style.display = 'none';
+        app.className = 'app-with-debug';
+    } else {
+        panel.style.display = 'none';
+        tab.style.display = 'block';
+        app.className = 'app-no-debug';
+    }
+
+    // BP toggle colour
+    document.getElementById('bp-toggle').style.color = appState.paintMode === 'BP' ? 'red' : 'black';
+
+    // Speed slider
+    document.getElementById('speed-slider').value = 1000 - appState.debug.runSpeed;
+
+    // Pointers
+    const dpArrows = ['right', 'down', 'left', 'up'];
+    const ccArrows = ['left', 'right'];
+    document.getElementById('pointers').innerHTML =
+        'DP:&nbsp;<i class="glyphicon glyphicon-arrow-' + dpArrows[appState.debug.DP] + '"></i>&emsp;' +
+        'CC:&nbsp;<i class="glyphicon glyphicon-arrow-' + ccArrows[appState.debug.CC] + '"></i>';
+
+    // Stack
+    const stackBody = document.getElementById('stack-body');
+    stackBody.innerHTML = '';
+    const stackDisplay = appState.debug.stack.concat(['\u2B9F']); // ⮟
+    for (const val of stackDisplay) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.textContent = val;
+        tr.appendChild(td);
+        stackBody.appendChild(tr);
+    }
+
+    // Command list
+    const cmdList = document.getElementById('command-list');
+    cmdList.innerHTML = '';
+    const isInterpreting = appState.debug.interpreter != null;
+    for (let i = 0; i < appState.debug.commandList.length; i++) {
+        const cmd = appState.debug.commandList[i];
+        const div = document.createElement('div');
+        div.className = 'command-entry';
+        div.textContent = cmd.inst;
+        if (cmd.error) {
+            div.innerHTML += ' <i class="glyphicon glyphicon-exclamation-sign" style="color:red;" title="' + cmd.error + '"></i>';
+        }
+        div.onmouseover = function() { if (!isInterpreting) appState.debug.selectBlock(cmd.block); };
+        div.onmouseout = function() { if (!isInterpreting) appState.debug.selectBlock(null); };
+        cmdList.appendChild(div);
+    }
+    // Auto-scroll command list to bottom
+    cmdList.scrollTop = cmdList.scrollHeight;
+
+    // Current command
+    const cmdDisplay = document.getElementById('current-command-display');
+    if (isInterpreting && appState.debug.currCommand) {
+        cmdDisplay.style.display = 'block';
+        let html = 'Current command:<br>' + appState.debug.currCommand.inst.toUpperCase();
+        if (appState.debug.currCommand.error) {
+            html += '<div style="color:red;">' + appState.debug.currCommand.error + '</div>';
+        }
+        cmdDisplay.innerHTML = html;
+    } else {
+        cmdDisplay.style.display = 'none';
+    }
+
+    // Output
+    document.getElementById('out').value = appState.debug.output;
+}
+
+function render() {
+    updateGrid();
+    updateColourPicker();
+    updateControls();
+    updateDebugger();
+}
+
+// ============================================================
+// EVENT BINDINGS
+// ============================================================
+function init() {
+    // Subscribe to state changes
+    appState.subscribe(render);
+
+    // Grid mouse events (delegation)
+    const gridBody = document.getElementById('grid-body');
+    gridBody.addEventListener('click', function(e) {
+        const td = e.target.closest('td');
+        if (td && td.dataset.row !== undefined) {
+            appState.handleCellClick(parseInt(td.dataset.row), parseInt(td.dataset.col));
+        }
+    });
+    gridBody.addEventListener('mouseover', function(e) {
+        const td = e.target.closest('td');
+        if (td && td.dataset.row !== undefined) {
+            appState.setCellInFocus(parseInt(td.dataset.row), parseInt(td.dataset.col));
+        }
+    });
+    document.getElementById('grid-table').addEventListener('mouseout', function(e) {
+        // Only clear if leaving the table entirely
+        if (!e.relatedTarget || !document.getElementById('grid-table').contains(e.relatedTarget)) {
+            appState.setCellInFocus(null);
+        }
+    });
+
+    // Import
+    document.getElementById('import-btn').addEventListener('click', function() {
+        document.getElementById('fileChooser').click();
+    });
+    document.getElementById('fileChooser').addEventListener('change', function(e) {
+        if (e.target.files[0]) {
+            appState.importImg(e.target.files[0]);
+            e.target.value = '';
+        }
+    });
+
+    // Export
+    document.getElementById('export-btn').addEventListener('click', function() {
+        appState.exportPng(parseInt(document.getElementById('scale').value) || 1);
+    });
+
+    // Paint mode
+    document.getElementById('brush-btn').addEventListener('click', function() {
+        appState.selectPaintMode('BRUSH');
+    });
+    document.getElementById('bucket-btn').addEventListener('click', function() {
+        appState.selectPaintMode('BUCKET');
+    });
+
+    // Resize
+    document.getElementById('resize-btn').addEventListener('click', function() {
+        appState.resize({
+            height: parseInt(document.getElementById('input-height').value),
+            width: parseInt(document.getElementById('input-width').value),
+        });
+    });
+
+    // Block size toggle
+    document.getElementById('bs-toggle').addEventListener('click', function() {
+        appState.toggleDisplayBS();
+    });
+
+    // Debug tab toggle
+    document.getElementById('debug-tab').addEventListener('click', function() {
+        appState.toggleDebugger();
+    });
+    document.getElementById('close-debugger').addEventListener('click', function() {
+        appState.toggleDebugger();
+    });
+
+    // Debug controls
+    document.getElementById('debug-run').addEventListener('click', function() {
+        appState.debug.start();
+    });
+    document.getElementById('debug-pause').addEventListener('click', function() {
+        appState.debug.pause();
+    });
+    document.getElementById('debug-step').addEventListener('click', function() {
+        appState.debug.step();
+    });
+    document.getElementById('debug-cont').addEventListener('click', function() {
+        appState.debug.cont();
+    });
+    document.getElementById('debug-stop').addEventListener('click', function() {
+        appState.debug.stop();
+    });
+
+    // Speed slider
+    document.getElementById('speed-slider').addEventListener('input', function(e) {
+        const isInterpreting = appState.debug.interpreter != null;
+        if (!isInterpreting) {
+            appState.debug.setRunSpeed(1000 - parseInt(e.target.value));
+        }
+    });
+
+    // Breakpoint toggle
+    document.getElementById('bp-toggle').addEventListener('click', function() {
+        appState.debug.toggleSetBP();
+    });
+
+    // Debugger drag
+    let dragStartY = 0;
+    const dragHandle = document.getElementById('debugger-drag');
+    dragHandle.addEventListener('dragstart', function(e) {
+        e.dataTransfer.setData('text/plain', '');
+        dragStartY = e.screenY;
+    });
+    dragHandle.addEventListener('dragend', function(e) {
+        const panel = document.getElementById('debugger-panel');
+        const currentMargin = parseInt(panel.style.marginTop) || 0;
+        panel.style.marginTop = (currentMargin + e.screenY - dragStartY) + 'px';
+    });
+
+    // Initial render
+    buildGrid();
+    render();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+
+})();
+</script>
+</body>
+</html>
