@@ -23,3 +23,4 @@ Open `index.html` in any modern browser. No build step or server required.
 - **No site navigation** — standalone page, no external template dependencies
 - **Iterative flood fills** — avoids stack overflow on large grids
 - **Improved active block highlight** — uses inverse-colour inset border instead of text characters, preventing layout shift during debugging
+- **Initial block highlighted on debug start** — the first block is now visible when stepping or running

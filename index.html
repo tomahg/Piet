@@ -890,7 +890,7 @@ const appState = {
             this.DP = 0; this.CC = 0;
             this.stack = []; this.output = '';
             this.inputPtr = 0;
-            this.block = null; this.currCommand = null;
+            this.block = appState.blocks[0][0]; this.currCommand = null;
             this.interpreter = null;
             this.receiveInput();
             appState.notify();
@@ -943,7 +943,7 @@ const appState = {
         },
 
         step() {
-            if (!this.interpreter) this.initDebugger();
+            if (!this.interpreter) { this.initDebugger(); return; }
             let s = this.interpreter.next();
             if (!s.done) {
                 for (let prop in s.value) this[prop] = s.value[prop];
