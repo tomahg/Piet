@@ -223,7 +223,6 @@ textarea.io-field {
         </div>
         <div style="padding:5px;">
             <div id="command-list"></div>
-            <div id="current-command-display" style="margin:-5px 0 10px; width:100%; font-weight:bold; text-align:center; display:none;"></div>
 
             <!-- Debug Controls -->
             <div class="btn-toolbar" role="toolbar" style="margin:0 0 1vh;">
@@ -1215,21 +1214,19 @@ function updateDebugger() {
         div.onmouseout = function() { if (!isInterpreting) appState.debug.selectBlock(null); };
         cmdList.appendChild(div);
     }
+    // Append current command inline (bold to distinguish from history)
+    if (isInterpreting && appState.debug.currCommand) {
+        const div = document.createElement('div');
+        div.className = 'command-entry';
+        div.style.fontWeight = 'bold';
+        div.textContent = appState.debug.currCommand.inst;
+        if (appState.debug.currCommand.error) {
+            div.innerHTML += ' <i class="glyphicon glyphicon-exclamation-sign" style="color:red;" title="' + appState.debug.currCommand.error + '"></i>';
+        }
+        cmdList.appendChild(div);
+    }
     // Auto-scroll command list to bottom
     cmdList.scrollTop = cmdList.scrollHeight;
-
-    // Current command
-    const cmdDisplay = document.getElementById('current-command-display');
-    if (isInterpreting && appState.debug.currCommand) {
-        cmdDisplay.style.display = 'block';
-        let html = 'Current command:<br>' + appState.debug.currCommand.inst.toUpperCase();
-        if (appState.debug.currCommand.error) {
-            html += '<div style="color:red;">' + appState.debug.currCommand.error + '</div>';
-        }
-        cmdDisplay.innerHTML = html;
-    } else {
-        cmdDisplay.style.display = 'none';
-    }
 
     // Output
     document.getElementById('out').value = appState.debug.output;
