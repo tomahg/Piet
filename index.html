@@ -1054,11 +1054,27 @@ function updateGrid() {
                 td.style.background = colour;
             }
 
-            // Active block highlight (inset shadow, inverse colour, no layout shift)
-            const isActiveBlock = appState.debug.block != null && appState.blocks[i][j] === appState.debug.block;
+            // Active block highlight — white outline around the entire block's perimeter
+            const activeBlock = appState.debug.block;
+            const isActiveBlock = activeBlock != null && appState.blocks[i][j] === activeBlock;
             if (isActiveBlock) {
-                const [cr, cg, cb] = colourRgbs[colIdx];
-                td.style.boxShadow = 'inset 0 0 0 2px rgb(' + (255 - cr) + ',' + (255 - cg) + ',' + (255 - cb) + ')';
+                const shadows = [];
+                const wo = 4; // outer white border width
+                const wi = 6; // outer + inner black (4 + 2)
+                const isTop = i === 0 || appState.blocks[i - 1][j] !== activeBlock;
+                const isBot = i === appState.height - 1 || appState.blocks[i + 1][j] !== activeBlock;
+                const isLft = j === 0 || appState.blocks[i][j - 1] !== activeBlock;
+                const isRgt = j === appState.width - 1 || appState.blocks[i][j + 1] !== activeBlock;
+                // White outer layer first, then black inner layer (order matters: first listed = on top)
+                if (isTop) shadows.push('inset 0 ' + wo + 'px 0 0 white');
+                if (isBot) shadows.push('inset 0 -' + wo + 'px 0 0 white');
+                if (isLft) shadows.push('inset ' + wo + 'px 0 0 0 white');
+                if (isRgt) shadows.push('inset -' + wo + 'px 0 0 0 white');
+                if (isTop) shadows.push('inset 0 ' + wi + 'px 0 0 black');
+                if (isBot) shadows.push('inset 0 -' + wi + 'px 0 0 black');
+                if (isLft) shadows.push('inset ' + wi + 'px 0 0 0 black');
+                if (isRgt) shadows.push('inset -' + wi + 'px 0 0 0 black');
+                td.style.boxShadow = shadows.length ? shadows.join(',') : 'none';
             } else {
                 td.style.boxShadow = 'none';
             }
