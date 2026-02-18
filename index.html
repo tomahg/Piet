@@ -1054,10 +1054,17 @@ function updateGrid() {
                 td.style.background = colour;
             }
 
+            // Active block highlight (inset shadow, inverse colour, no layout shift)
+            const isActiveBlock = appState.debug.block != null && appState.blocks[i][j] === appState.debug.block;
+            if (isActiveBlock) {
+                const [cr, cg, cb] = colourRgbs[colIdx];
+                td.style.boxShadow = 'inset 0 0 0 2px rgb(' + (255 - cr) + ',' + (255 - cg) + ',' + (255 - cb) + ')';
+            } else {
+                td.style.boxShadow = 'none';
+            }
+
             // Cell content
-            if (appState.blocks[i][j] === appState.debug.block) {
-                td.textContent = '\u25C9'; // ◉
-            } else if (appState.displayBS && appState.blockSizes[i][j]) {
+            if (appState.displayBS && appState.blockSizes[i][j]) {
                 td.textContent = appState.blockSizes[i][j];
             } else {
                 td.textContent = '';
