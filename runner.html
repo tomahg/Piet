@@ -3,62 +3,39 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MasterPiets 2.0</title>
+<title>MasterPiets 2.0 - Runner</title>
 <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/foundation-icons/3.0/foundation-icons.min.css" rel="stylesheet">
 <style>
 * { box-sizing: border-box; }
-body { margin: 0; padding: 10px; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 14px; }
+body { margin: 0; padding: 0; background: black; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 14px; }
 
-#app {
-    width: 100%;
-    margin-bottom: 1vh;
-    display: grid;
-    grid-column-gap: 1vw;
-    grid-row-gap: 1vh;
-    align-items: center;
-}
-
-.app-no-debug {
-    grid-template-columns: 375px 300px auto 25px;
-    grid-template-rows: 35px 35px 35px auto;
-    grid-template-areas:
-        'controls1 cpicker . dtab'
-        'controls2 cpicker . dtab'
-        'controls3 cpicker . dtab'
-        'grid grid grid grid';
-}
-
-.app-with-debug {
-    grid-template-columns: 375px 300px auto 225px;
-    grid-template-rows: 35px 35px 35px auto;
-    grid-template-areas:
-        'controls1 cpicker . debug'
-        'controls2 cpicker . debug'
-        'controls3 cpicker . debug'
-        'grid grid grid debug';
-}
-
-#controls-row-1 { grid-area: controls1; }
-#controls-row-2 { grid-area: controls2; display: flex; justify-content: space-between; align-items: center; }
-#controls-row-3 { grid-area: controls3; }
-#colour-picker { grid-area: cpicker; grid-row: 1 / 4; }
-#grid-container { grid-area: grid; align-self: start; justify-self: start; }
-#debug-tab { grid-area: dtab; }
-#debugger-panel {
-    grid-area: debug;
-    grid-row: 1 / 5;
-    align-self: start;
-    margin-top: 0;
-    width: 225px;
+/* Floating panels */
+.float-panel {
+    position: fixed;
+    z-index: 1000;
+    background: white;
     border: 1px solid #ddd;
     border-radius: 5px;
-    background: white;
-    pointer-events: auto;
+    box-shadow: 2px 2px 8px rgba(0,0,0,0.2);
+    user-select: none;
+    min-width: 180px;
+}
+.float-panel-header {
+    background: #eee;
+    border-bottom: 1px solid #ddd;
+    border-radius: 5px 5px 0 0;
+    padding: 4px 8px;
+    cursor: move;
+    font-weight: bold;
+    font-size: 12px;
+}
+.float-panel-body {
+    padding: 5px;
 }
 
 #grid-table {
-    margin: 1vh 0 0 0;
+    margin: 0;
     table-layout: fixed;
     border-collapse: collapse;
 }
@@ -75,38 +52,12 @@ body { margin: 0; padding: 10px; font-family: "Helvetica Neue", Helvetica, Arial
     overflow: hidden;
 }
 
-/* Colour picker table */
-#colour-picker td {
-    width: 32px;
-    height: 32px;
-    padding: 5px;
-    border: 1px solid black;
-    color: white;
-    text-shadow: 1px 1px 1px black;
-    text-align: center;
-    cursor: pointer;
-    font-size: 11px;
-}
-
-#colour-picker td.selected {
-    border: 4px double black;
-}
-
-/* Debugger */
-.debugger-drag-handle {
-    height: 25px;
-    padding: 0 5px 5px;
-    border-bottom: 1px solid #ddd;
-    border-radius: 5px 5px 0 0;
-    background-color: #eee;
-    cursor: ns-resize;
-}
 
 #command-list {
-    margin: 5px auto 10px;
+    margin: 0;
     padding: 5px;
     width: 100%;
-    height: 40vh;
+    height: 250px;
     resize: vertical;
     overflow: auto;
     font-family: monospace;
@@ -136,6 +87,22 @@ textarea.io-field {
     font-size: 12pt;
 }
 
+/* Colour picker */
+#colour-picker td {
+    width: 32px;
+    height: 32px;
+    padding: 5px;
+    border: 1px solid black;
+    color: white;
+    text-shadow: 1px 1px 1px black;
+    text-align: center;
+    cursor: pointer;
+    font-size: 11px;
+}
+#colour-picker td.selected {
+    border: 4px double black;
+}
+
 /* Paint mode button active style */
 .paint-mode-btn.active-mode {
     background-color: #d4d4d4;
@@ -147,133 +114,136 @@ textarea.io-field {
 </head>
 <body>
 
-<main class="container-fluid">
-<div class="page-header" style="margin-top:0; padding-bottom:5px;">
-    <h2 style="margin-top:10px;">MasterPiets 2.0</h2>
-    <p>An IDE for the programming language <a href="http://www.dangermouse.net/esoteric/piet.html">Piet</a>. A fork of <a href="https://gabriellesc.github.io/piet/">MasterPiets</a> by Gabrielle Singh Cadieux. I just fixed the import/export bugs.</p>
+
+<!-- Floating Panel: Canvas -->
+<div class="float-panel" id="panel-canvas" style="left:10px; top:10px;">
+    <div class="float-panel-header">Piet <span id="block-info" style="font-weight:normal; font-size:11px; color:#666;"></span></div>
+    <div class="float-panel-body">
+        <div id="grid-container">
+            <table id="grid-table"><tbody id="grid-body"></tbody></table>
+        </div>
+    </div>
 </div>
 
-<div id="app" class="app-no-debug">
-
-    <!-- Controls Row 1: Import/Export + Paint Mode -->
-    <div id="controls-row-1" class="btn-toolbar" role="toolbar">
-        <input type="button" class="btn btn-primary" value="Import" id="import-btn">
-        <input id="fileChooser" type="file" accept="image/png, image/bmp, image/jpeg, image/gif" style="display:none">
-
-        <div class="btn-group">
-            <button type="button" class="btn btn-info" id="export-btn">Export to PNG</button>
-            <button type="button" class="btn btn-info dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                <span class="caret"></span>
-                <span class="sr-only">Toggle Dropdown</span>
-            </button>
-            <ul class="dropdown-menu">
-                <li>
-                    <div class="form-group" style="margin-left:1vw; margin-bottom:0;">
-                        <label class="control-label" for="scale">Scale</label>
-                        <input id="scale" type="number" name="scale" class="form-control" style="width:5em; margin-left:4px; display:inline-block;" value="1" required>
-                    </div>
-                </li>
-            </ul>
+<!-- Floating Panel: Code -->
+<div class="float-panel" id="panel-code" style="left:10px; top:10px; width:320px;">
+    <div class="float-panel-header">Code</div>
+    <div class="float-panel-body">
+        <div style="margin-bottom:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+            <label style="margin:0;">H</label>
+            <input type="number" id="input-height" class="form-control" style="width:5em;" required value="10">
+            <label style="margin:0;">W</label>
+            <input type="number" id="input-width" class="form-control" style="width:5em;" required value="10">
+            <input type="button" class="btn btn-warning btn-sm" value="Resize / Clear" id="resize-btn">
         </div>
-
-        <div class="btn-group" role="group" style="float:right;">
-            <button type="button" title="Brush mode (fill single pixel)" class="btn btn-default paint-mode-btn active-mode" id="brush-btn" style="padding:2px 12px;">
-                <i class="fi-pencil" style="font-size:14pt;"></i>
-            </button>
-            <button type="button" title="Bucket mode (fill block of pixels)" class="btn btn-default paint-mode-btn" id="bucket-btn" style="padding:2px 12px;">
-                <i class="fi-paint-bucket" style="font-size:14pt;"></i>
-            </button>
-        </div>
-    </div>
-
-    <!-- Controls Row 2: Resize -->
-    <div id="controls-row-2">
-        <label for="input-height" style="margin:auto 0;">Height</label>
-        <input type="number" id="input-height" class="form-control" style="width:5em; display:inline-block;" required value="10">
-        <label for="input-width" style="margin:auto 0 auto 5px;">Width</label>
-        <input type="number" id="input-width" class="form-control" style="width:5em; display:inline-block;" required value="10">
-        <input type="button" class="btn btn-warning" value="Resize / Clear" id="resize-btn">
-    </div>
-
-    <!-- Controls Row 3: Block size display -->
-    <div id="controls-row-3">
-        <i class="glyphicon glyphicon-eye-close" id="bs-toggle" title="Show block sizes" style="font-size:16px; cursor:pointer;"></i>
-        <span id="block-info" style="margin-left:1em;"></span>
-    </div>
-
-    <!-- Colour Picker -->
-    <table id="colour-picker"><tbody id="colour-picker-body"></tbody></table>
-
-    <!-- Grid -->
-    <div id="grid-container">
-        <table id="grid-table"><tbody id="grid-body"></tbody></table>
-    </div>
-
-    <!-- Debug Tab (shown when debugger hidden) -->
-    <div id="debug-tab" style="writing-mode:vertical-rl; cursor:pointer; font-size:14px; color:#888; padding:5px;">
-        &#9654; Debug
-    </div>
-
-    <!-- Debugger Panel (hidden by default) -->
-    <div id="debugger-panel" style="display:none;">
-        <div class="debugger-drag-handle" id="debugger-drag">
-            <button type="button" class="close" aria-label="Close" id="close-debugger">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-        <div style="padding:5px;">
-            <div id="command-list"></div>
-
-            <!-- Debug Controls -->
-            <div class="btn-toolbar" role="toolbar" style="margin:0 0 1vh;">
-                <div class="btn-group btn-group-sm" style="width:52px; margin:0;">
-                    <button type="button" class="btn btn-success" title="Run from the beginning" id="debug-run">
-                        <i class="glyphicon glyphicon-play"></i>
-                    </button>
-                    <button type="button" class="btn btn-success dropdown-toggle" title="Set run speed" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" style="width:18px; padding-left:4px; padding-right:4px;">
-                        <span class="caret"></span>
-                        <span class="sr-only">Toggle Dropdown</span>
-                    </button>
-                    <ul class="dropdown-menu">
-                        <li style="padding:0 5px;">
-                            <small style="float:left;">Slower</small>
-                            <small style="float:right;">Faster</small>
-                            <input type="range" min="0" max="1000" step="100" id="speed-slider" value="500">
-                        </li>
-                    </ul>
-                </div>
-                <div class="btn-group btn-group-sm" role="group" style="width:136px; margin:0 0 0 4px;">
-                    <button type="button" class="btn btn-warning" title="Pause" id="debug-pause">
-                        <i class="glyphicon glyphicon-pause"></i>
-                    </button>
-                    <button type="button" class="btn btn-info" title="Step" id="debug-step">
-                        <i class="glyphicon glyphicon-step-forward"></i>
-                    </button>
-                    <button type="button" class="btn btn-primary" title="Continue running from this point" id="debug-cont">
-                        <i class="glyphicon glyphicon-fast-forward"></i>
-                    </button>
-                    <button type="button" class="btn btn-danger" title="Stop" id="debug-stop">
-                        <i class="glyphicon glyphicon-stop"></i>
-                    </button>
-                </div>
-                <i class="glyphicon glyphicon-map-marker" title="Set breakpoints" id="bp-toggle" style="font-size:18px; margin:0 0 0 3px; padding:5px 0; cursor:pointer;"></i>
+        <div class="btn-toolbar" role="toolbar" style="margin-bottom:6px;">
+            <input type="button" class="btn btn-primary btn-sm" value="Import" id="import-btn">
+            <input id="fileChooser" type="file" accept="image/png, image/bmp, image/jpeg, image/gif" style="display:none">
+            <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-info" id="export-btn">Export to PNG</button>
+                <button type="button" class="btn btn-info dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <span class="caret"></span>
+                </button>
+                <ul class="dropdown-menu">
+                    <li>
+                        <div class="form-group" style="margin-left:1vw; margin-bottom:0;">
+                            <label class="control-label" for="scale">Scale</label>
+                            <input id="scale" type="number" name="scale" class="form-control" style="width:5em; margin-left:4px; display:inline-block;" value="1" required>
+                        </div>
+                    </li>
+                </ul>
             </div>
-
-            <!-- Pointers -->
-            <div id="pointers" style="width:100%; text-align:center; font-weight:bold; margin-bottom:1vh;"></div>
-
-            <!-- Stack -->
-            <table class="stack-table"><thead><tr><td><b>Stack</b></td></tr></thead><tbody id="stack-body"></tbody></table>
-
-            <!-- IO -->
-            <b>Input</b><br>
-            <textarea id="in" class="io-field" placeholder="Enter input before running program" title="Tip: Whitespace before a numerical value is ignored"></textarea><br>
-            <b>Output</b><br>
-            <textarea id="out" class="io-field" readonly></textarea>
+            <i class="glyphicon glyphicon-eye-close" id="bs-toggle" title="Show block sizes" style="font-size:16px; cursor:pointer; margin-left:4px; vertical-align:middle;"></i>
+        </div>
+        <table id="colour-picker"><tbody id="colour-picker-body"></tbody></table>
+        <div class="btn-toolbar" role="toolbar" style="margin-top:8px;">
+            <div class="btn-group btn-group-sm" role="group">
+                <button type="button" title="Brush mode" class="btn btn-default paint-mode-btn active-mode" id="brush-btn" style="padding:2px 12px;">
+                    <i class="fi-pencil" style="font-size:14pt;"></i>
+                </button>
+                <button type="button" title="Bucket mode" class="btn btn-default paint-mode-btn" id="bucket-btn" style="padding:2px 12px;">
+                    <i class="fi-paint-bucket" style="font-size:14pt;"></i>
+                </button>
+            </div>
         </div>
     </div>
 </div>
-</main>
+
+<!-- Floating Panel 1: Commands -->
+<div class="float-panel" id="panel-commands" style="left:10px; top:10px; width:250px;">
+    <div class="float-panel-header">Commands</div>
+    <div class="float-panel-body">
+        <div id="command-list"></div>
+    </div>
+</div>
+
+<!-- Floating Panel 2: Controls + Pointers -->
+<div class="float-panel" id="panel-controls" style="left:10px; top:10px; width:250px;">
+    <div class="float-panel-header">Debug Controls</div>
+    <div class="float-panel-body">
+        <div class="btn-toolbar" role="toolbar" style="margin:0 0 8px;">
+            <div class="btn-group btn-group-sm" style="width:52px; margin:0;">
+                <button type="button" class="btn btn-success" title="Run from the beginning" id="debug-run">
+                    <i class="glyphicon glyphicon-play"></i>
+                </button>
+                <button type="button" class="btn btn-success dropdown-toggle" title="Set run speed" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" style="width:18px; padding-left:4px; padding-right:4px;">
+                    <span class="caret"></span>
+                    <span class="sr-only">Toggle Dropdown</span>
+                </button>
+                <ul class="dropdown-menu">
+                    <li style="padding:0 5px;">
+                        <small style="float:left;">Slower</small>
+                        <small style="float:right;">Faster</small>
+                        <input type="range" min="0" max="1000" step="100" id="speed-slider" value="500">
+                    </li>
+                </ul>
+            </div>
+            <div class="btn-group btn-group-sm" role="group" style="width:136px; margin:0 0 0 4px;">
+                <button type="button" class="btn btn-warning" title="Pause" id="debug-pause">
+                    <i class="glyphicon glyphicon-pause"></i>
+                </button>
+                <button type="button" class="btn btn-info" title="Step" id="debug-step">
+                    <i class="glyphicon glyphicon-step-forward"></i>
+                </button>
+                <button type="button" class="btn btn-primary" title="Continue running from this point" id="debug-cont">
+                    <i class="glyphicon glyphicon-fast-forward"></i>
+                </button>
+                <button type="button" class="btn btn-danger" title="Stop" id="debug-stop">
+                    <i class="glyphicon glyphicon-stop"></i>
+                </button>
+            </div>
+            <i class="glyphicon glyphicon-map-marker" title="Set breakpoints" id="bp-toggle" style="font-size:18px; margin:0 0 0 3px; padding:5px 0; cursor:pointer;"></i>
+        </div>
+    </div>
+</div>
+
+<!-- Floating Panel 3: Stack -->
+<div class="float-panel" id="panel-stack" style="left:10px; top:10px; width:250px;">
+    <div class="float-panel-header">Stack</div>
+    <div class="float-panel-body">
+        <div id="pointers" style="width:100%; text-align:center; font-weight:bold; margin-bottom:5px;"></div>
+        <div style="height:150px; resize:vertical; overflow-y:auto; overflow-x:hidden;">
+            <table class="stack-table"><thead><tr><td><b>Stack</b></td></tr></thead><tbody id="stack-body"></tbody></table>
+        </div>
+    </div>
+</div>
+
+<!-- Floating Panel 4: Output -->
+<!-- Floating Panel: Input -->
+<div class="float-panel" id="panel-input" style="left:10px; top:10px; width:250px;">
+    <div class="float-panel-header">Input</div>
+    <div class="float-panel-body">
+        <textarea id="in" class="io-field" placeholder="Enter input before running program" title="Tip: Whitespace before a numerical value is ignored"></textarea>
+    </div>
+</div>
+
+<!-- Floating Panel: Output -->
+<div class="float-panel" id="panel-output" style="left:10px; top:10px; width:250px;">
+    <div class="float-panel-header">Output</div>
+    <div class="float-panel-body">
+        <textarea id="out" class="io-field" readonly></textarea>
+    </div>
+</div>
 
 <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
@@ -721,7 +691,6 @@ const appState = {
         if (this.grid[row][col] !== this.selectedColour) {
             const origColour = this.grid[row][col];
             const selectedColour = this.selectedColour;
-            // Use iterative flood fill to avoid stack overflow on large grids
             const stack = [[row, col]];
             while (stack.length > 0) {
                 const [r, c] = stack.pop();
@@ -854,13 +823,8 @@ const appState = {
         return { blockMap, blockSizes };
     },
 
-    toggleDebugger() {
-        this.debug.debugIsVisible = !this.debug.debugIsVisible;
-        this.notify();
-    },
-
     debug: {
-        debugIsVisible: false,
+        debugIsVisible: true,
         commandList: [],
         interpreter: null,
         runner: null,
@@ -1026,16 +990,6 @@ function updateGrid() {
         buildGrid();
     }
 
-    const cursor = {
-        'BRUSH': 'crosshair',
-        'BUCKET': 'cell',
-        'BP': 'pointer',
-    }[appState.paintMode];
-
-    // Update grid span
-    const gridContainer = document.getElementById('grid-container');
-    gridContainer.style.gridColumn = 'grid / span ' + (appState.debug.debugIsVisible ? '3' : '4');
-
     for (let i = 0; i < appState.height; i++) {
         for (let j = 0; j < appState.width; j++) {
             const td = gridCells[i][j];
@@ -1045,7 +999,7 @@ function updateGrid() {
 
             td.style.height = appState.cellDim + 'px';
             td.style.width = appState.cellDim + 'px';
-            td.style.cursor = cursor;
+            td.style.cursor = { 'BRUSH': 'crosshair', 'BUCKET': 'cell', 'BP': 'pointer' }[appState.paintMode] || 'default';
 
             if (isBreakpoint) {
                 td.style.background = 'repeating-linear-gradient(45deg, ' + colour + ', ' + colour + ' 2px, black 2px, black 4px)';
@@ -1088,48 +1042,6 @@ function updateGrid() {
     }
 }
 
-function updateColourPicker() {
-    const tbody = document.getElementById('colour-picker-body');
-    tbody.innerHTML = '';
-
-    const colourRows = [
-        colours.slice(0, 6).map((_, j) => j),
-        colours.slice(6, 12).map((_, j) => 6 + j),
-        colours.slice(12, 18).map((_, j) => 12 + j),
-    ];
-
-    for (const row of colourRows) {
-        const tr = document.createElement('tr');
-        for (const ci of row) {
-            const td = document.createElement('td');
-            td.style.backgroundColor = colours[ci];
-            if (appState.selectedColour === ci) td.className = 'selected';
-            td.textContent = appState.commands[ci] || '';
-            td.onclick = () => appState.selectColour(ci);
-            tr.appendChild(td);
-        }
-        tbody.appendChild(tr);
-    }
-
-    // White and black row
-    const tr = document.createElement('tr');
-    const tdWhite = document.createElement('td');
-    tdWhite.colSpan = 3;
-    tdWhite.style.backgroundColor = colours[WHITE];
-    if (appState.selectedColour === WHITE) tdWhite.className = 'selected';
-    tdWhite.onclick = () => appState.selectColour(WHITE);
-    tr.appendChild(tdWhite);
-
-    const tdBlack = document.createElement('td');
-    tdBlack.colSpan = 3;
-    tdBlack.style.backgroundColor = colours[BLACK];
-    if (appState.selectedColour === BLACK) tdBlack.className = 'selected';
-    tdBlack.onclick = () => appState.selectColour(BLACK);
-    tr.appendChild(tdBlack);
-
-    tbody.appendChild(tr);
-}
-
 function updateControls() {
     const isInterpreting = appState.debug.interpreter != null;
 
@@ -1159,20 +1071,6 @@ function updateControls() {
 }
 
 function updateDebugger() {
-    const panel = document.getElementById('debugger-panel');
-    const tab = document.getElementById('debug-tab');
-    const app = document.getElementById('app');
-
-    if (appState.debug.debugIsVisible) {
-        panel.style.display = 'block';
-        tab.style.display = 'none';
-        app.className = 'app-with-debug';
-    } else {
-        panel.style.display = 'none';
-        tab.style.display = 'block';
-        app.className = 'app-no-debug';
-    }
-
     // BP toggle colour
     document.getElementById('bp-toggle').style.color = appState.paintMode === 'BP' ? 'red' : 'black';
 
@@ -1233,6 +1131,47 @@ function updateDebugger() {
     document.getElementById('out').value = appState.debug.output;
 }
 
+function updateColourPicker() {
+    const tbody = document.getElementById('colour-picker-body');
+    tbody.innerHTML = '';
+
+    const colourRows = [
+        colours.slice(0, 6).map((_, j) => j),
+        colours.slice(6, 12).map((_, j) => 6 + j),
+        colours.slice(12, 18).map((_, j) => 12 + j),
+    ];
+
+    for (const row of colourRows) {
+        const tr = document.createElement('tr');
+        for (const ci of row) {
+            const td = document.createElement('td');
+            td.style.backgroundColor = colours[ci];
+            if (appState.selectedColour === ci) td.className = 'selected';
+            td.textContent = appState.commands[ci] || '';
+            td.onclick = () => appState.selectColour(ci);
+            tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+    }
+
+    const tr = document.createElement('tr');
+    const tdWhite = document.createElement('td');
+    tdWhite.colSpan = 3;
+    tdWhite.style.backgroundColor = colours[WHITE];
+    if (appState.selectedColour === WHITE) tdWhite.className = 'selected';
+    tdWhite.onclick = () => appState.selectColour(WHITE);
+    tr.appendChild(tdWhite);
+
+    const tdBlack = document.createElement('td');
+    tdBlack.colSpan = 3;
+    tdBlack.style.backgroundColor = colours[BLACK];
+    if (appState.selectedColour === BLACK) tdBlack.className = 'selected';
+    tdBlack.onclick = () => appState.selectColour(BLACK);
+    tr.appendChild(tdBlack);
+
+    tbody.appendChild(tr);
+}
+
 function render() {
     updateGrid();
     updateColourPicker();
@@ -1284,6 +1223,7 @@ function init() {
         appState.exportPng(parseInt(document.getElementById('scale').value) || 1);
     });
 
+
     // Paint mode
     document.getElementById('brush-btn').addEventListener('click', function() {
         appState.selectPaintMode('BRUSH');
@@ -1303,14 +1243,6 @@ function init() {
     // Block size toggle
     document.getElementById('bs-toggle').addEventListener('click', function() {
         appState.toggleDisplayBS();
-    });
-
-    // Debug tab toggle
-    document.getElementById('debug-tab').addEventListener('click', function() {
-        appState.toggleDebugger();
-    });
-    document.getElementById('close-debugger').addEventListener('click', function() {
-        appState.toggleDebugger();
     });
 
     // Debug controls
@@ -1343,22 +1275,80 @@ function init() {
         appState.debug.toggleSetBP();
     });
 
-    // Debugger drag
-    let dragStartY = 0;
-    const dragHandle = document.getElementById('debugger-drag');
-    dragHandle.addEventListener('dragstart', function(e) {
-        e.dataTransfer.setData('text/plain', '');
-        dragStartY = e.screenY;
-    });
-    dragHandle.addEventListener('dragend', function(e) {
-        const panel = document.getElementById('debugger-panel');
-        const currentMargin = parseInt(panel.style.marginTop) || 0;
-        panel.style.marginTop = (currentMargin + e.screenY - dragStartY) + 'px';
-    });
+    // Floating panel drag
+    function makeDraggable(panel) {
+        const header = panel.querySelector('.float-panel-header');
+        let startX, startY, startLeft, startTop;
+        header.addEventListener('mousedown', function(e) {
+            startX = e.clientX;
+            startY = e.clientY;
+            startLeft = parseInt(panel.style.left) || panel.getBoundingClientRect().left;
+            startTop = parseInt(panel.style.top) || panel.getBoundingClientRect().top;
+            function onMouseMove(e) {
+                panel.style.left = (startLeft + e.clientX - startX) + 'px';
+                panel.style.top = (startTop + e.clientY - startY) + 'px';
+            }
+            function onMouseUp() {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            }
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+            e.preventDefault();
+        });
+    }
+    document.querySelectorAll('.float-panel').forEach(makeDraggable);
 
     // Initial render
     buildGrid();
     render();
+
+    // Position panels in 4-column layout
+    const GAP = 10;
+
+    // Col 1: Piet (already at left:10px, top:10px)
+    const pietRect = document.getElementById('panel-canvas').getBoundingClientRect();
+
+    // Col 2: Code
+    const codePanel = document.getElementById('panel-code');
+    codePanel.style.left = (pietRect.right + GAP) + 'px';
+    codePanel.style.top = pietRect.top + 'px';
+    const codeRect = codePanel.getBoundingClientRect();
+
+    // Col 3: Stack, Input, Output (stacked vertically)
+    const col3Left = codeRect.right + GAP;
+    let col3Top = pietRect.top;
+
+    const stackPanel = document.getElementById('panel-stack');
+    stackPanel.style.left = col3Left + 'px';
+    stackPanel.style.top = col3Top + 'px';
+    const stackRect = stackPanel.getBoundingClientRect();
+    col3Top = stackRect.bottom + GAP;
+
+    const inputPanel = document.getElementById('panel-input');
+    inputPanel.style.left = col3Left + 'px';
+    inputPanel.style.top = col3Top + 'px';
+    const inputRect = inputPanel.getBoundingClientRect();
+    col3Top = inputRect.bottom + GAP;
+
+    const outputPanel = document.getElementById('panel-output');
+    outputPanel.style.left = col3Left + 'px';
+    outputPanel.style.top = col3Top + 'px';
+    const outputRect = outputPanel.getBoundingClientRect();
+
+    // Col 4: Debug Controls, Commands (stacked vertically)
+    const col4Left = Math.max(stackRect.right, inputRect.right, outputRect.right) + GAP;
+    let col4Top = pietRect.top;
+
+    const controlsPanel = document.getElementById('panel-controls');
+    controlsPanel.style.left = col4Left + 'px';
+    controlsPanel.style.top = col4Top + 'px';
+    const controlsRect = controlsPanel.getBoundingClientRect();
+    col4Top = controlsRect.bottom + GAP;
+
+    const commandsPanel = document.getElementById('panel-commands');
+    commandsPanel.style.left = col4Left + 'px';
+    commandsPanel.style.top = col4Top + 'px';
 }
 
 document.addEventListener('DOMContentLoaded', init);
