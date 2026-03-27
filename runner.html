@@ -943,6 +943,10 @@ const appState = {
             this.interpreter = null;
             this.block = null;
             this.currCommand = null;
+            this.commandList = [];
+            this.stack = [];
+            this.output = '';
+            this.DP = 0; this.CC = 0;
             clearInterval(this.runner);
             appState.notify();
         },
